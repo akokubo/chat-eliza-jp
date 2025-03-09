@@ -42,7 +42,7 @@ if "eliza_bot" not in st.session_state:
     st.session_state.messages.append(AIMessage(content=translate_to_japanese(initial_msg)))
 
 # ===============================
-# LangChain Expression Languageを使ったチェインの定義
+# LangChainのRunnableLambdaを使ったチェインの定義
 # ===============================
 eliza_chain = RunnableLambda(lambda x: st.session_state.eliza_bot.respond(x) or st.session_state.eliza_bot.final())
 
@@ -56,7 +56,7 @@ for message in st.session_state.messages:
         st.markdown(message.content)
 
 # ===============================
-# ユーザー入力の受付と処理（LCEL使用）
+# ユーザー入力の受付と処理（LangChainのRunnableLambdaを使用）
 # ===============================
 user_input = st.chat_input("ELIZAに質問してみてください")
 if user_input:
@@ -65,7 +65,7 @@ if user_input:
     with st.chat_message("user", avatar=":material/person:"):
         st.markdown(user_input)
 
-    # LCELを使用してELIZAの応答を生成
+    # LangChainのRunnableLambdaを使用してELIZAの応答を生成
     response = translate_to_japanese(eliza_chain.invoke(translate_to_english(user_input)))
 
     ai_msg = AIMessage(content=response)
