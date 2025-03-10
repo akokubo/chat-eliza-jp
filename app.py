@@ -16,11 +16,11 @@ llm = ChatOpenAI(
 
 def translate_to_english(text):
     """日本語を英語に翻訳"""
-    return llm.invoke(f"あなたは優秀な翻訳家です。次の文を英語に翻訳して、英語だけをシンプルに返して: {text}").content
+    return llm.invoke(f"あなたは優秀な翻訳家です。次の文は精神科医との面談で患者が発した言葉です。これを英語に翻訳して、英語だけをシンプルに返して: {text}").content
 
 def translate_to_japanese(text):
     """英語を日本語に翻訳"""
-    return llm.invoke(f"あなたは優秀な翻訳家です。次の文を日本語に翻訳して、日本語だけをシンプルに返して: {text}").content
+    return llm.invoke(f"あなたは優秀な翻訳家です。次の文は患者との面談で精神科医が発した言葉です。これを日本語に翻訳して、日本語だけをシンプルに返して: {text}").content
 
 # ===============================
 # ページの設定
