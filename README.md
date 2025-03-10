@@ -9,7 +9,7 @@
 ## インストール
 ```
 git clone https://github.com/akokubo/chat-eliza.git
-cd chat-eliza
+cd chat-eliza-jp
 python3 -m venv venv
 source venv/bin/activate
 python3 -m pip install --upgrade pip
