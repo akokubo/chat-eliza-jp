@@ -8,7 +8,7 @@ from eliza.eliza import Eliza
 # 翻訳に使うLLMの設定
 # ===============================
 llm = ChatOpenAI(
-    model_name="lucas2024/gemma-2-2b-jpn-it:q8_0",
+    model_name="gemma3",
     openai_api_base="http://localhost:11434/v1",
     openai_api_key='ollama',
     temperature=0.5,
