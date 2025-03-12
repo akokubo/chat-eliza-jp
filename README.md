@@ -8,7 +8,7 @@
 
 ## インストール
 ```
-git clone https://github.com/akokubo/chat-eliza.git
+git clone https://github.com/akokubo/chat-eliza-jp.git
 cd chat-eliza-jp
 python3 -m venv venv
 source venv/bin/activate
