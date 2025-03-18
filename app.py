@@ -1,92 +1,113 @@
 import streamlit as st
 from langchain.schema import AIMessage, HumanMessage
-from langchain.schema.runnable import RunnableLambda
-from langchain_openai.chat_models import ChatOpenAI
+from langchain_core.output_parsers import StrOutputParser
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_openai import ChatOpenAI
+from langchain.schema.runnable import Runnable
 from eliza.eliza import Eliza
 
 # ===============================
-# 翻訳に使うLLMの設定
+# Streamlitページの基本設定
 # ===============================
-llm = ChatOpenAI(
+st.set_page_config(
+    page_title="ELIZAチャットボット日本語版",
+    page_icon=":material/psychology:",
+    layout="wide"
+)
+st.title("ELIZAチャットボット日本語版")
+
+# ===============================
+# LLMの設定（ローカルLLMを利用）
+# ===============================
+translator_llm = ChatOpenAI(
     model_name="gemma3",
     openai_api_base="http://localhost:11434/v1",
     openai_api_key='ollama',
     temperature=0.5,
 )
 
-def translate_to_english(text):
-    """日本語を英語に翻訳"""
-    return llm.invoke(f"あなたは優秀な翻訳家です。次の文は精神科医との面談で患者が発した言葉です。これを英語に翻訳して、英語だけをシンプルに返して: {text}").content
+# ===============================
+# ELIZAをRunnable化するクラス定義
+# ===============================
+class ElizaRunnable(Runnable):
+    def __init__(self):
+        self.eliza = Eliza()
+        self.eliza.load("eliza/doctor.txt")
+        self.initial_msg = self.eliza.initial()
 
-def translate_to_japanese(text):
-    """英語を日本語に翻訳"""
-    return llm.invoke(f"あなたは優秀な翻訳家です。次の文は患者との面談で精神科医が発した言葉です。これを日本語に翻訳して、日本語だけをシンプルに返して: {text}").content
+    def invoke(self, input, config=None):
+        if isinstance(input, dict):
+            user_input = input.get('text', '').strip()
+        else:
+            user_input = str(input).strip()
+        return self.eliza.respond(user_input) if user_input else self.initial_msg
 
 # ===============================
-# ページの設定
+# 翻訳プロンプトの最適化
 # ===============================
-# Streamlitのページタイトル、アイコン、レイアウトを設定しています。
-st.set_page_config(
-    page_title="ELIZAチャットボット",         # ブラウザタブに表示されるタイトル
-    page_icon=":material/psychology:",         # ページアイコン（絵文字で指定）
-    layout="wide"                              # ページのレイアウトを横幅いっぱいに広げる
+translate_to_english_prompt = ChatPromptTemplate.from_template(
+    "あなたは優秀な翻訳家です。次の文は精神科医との面談で患者が発した言葉です。"
+    "これを英語に翻訳して、英語だけをシンプルに返して:\n\n{text}"
 )
-st.title("ELIZAチャットボット")  # ページの見出しを表示
+
+translate_to_japanese_prompt = ChatPromptTemplate.from_template(
+    "あなたは優秀な翻訳家です。次の文は患者との面談で精神科医が発した言葉です。"
+    "これを日本語に翻訳して、日本語だけをシンプルに返して:\n\n{text}"
+)
+
+# ===============================
+# チェインの構築
+# ===============================
+first_chain = (
+    ElizaRunnable()
+    | translate_to_japanese_prompt
+    | translator_llm
+    | StrOutputParser()
+)
+
+chain = (
+    translate_to_english_prompt
+    | translator_llm
+    | StrOutputParser()
+    | ElizaRunnable()
+    | translate_to_japanese_prompt
+    | translator_llm
+    | StrOutputParser()
+)
 
 # ===============================
 # セッション状態の初期化
 # ===============================
-# セッション状態を利用して、チャットの履歴やELIZAボットのインスタンスを保持します。
-
-# チャットメッセージのリストが未定義の場合、空のリストとして初期化
 if "messages" not in st.session_state:
     st.session_state.messages = []
-
-# ELIZAボットのインスタンスが未定義の場合、生成と初期設定を行う
-if "eliza_bot" not in st.session_state:
-    st.session_state.eliza_bot = Eliza()               # ELIZAボットのインスタンスを生成
-    st.session_state.eliza_bot.load("eliza/doctor.txt")  # スクリプトファイル（例: 医者の会話スクリプト）をロード
-    initial_msg = st.session_state.eliza_bot.initial()   # 初期メッセージを取得
-    st.session_state.messages.append(AIMessage(content=translate_to_japanese(initial_msg)))  # 初期メッセージをメッセージ履歴に追加
+    initial_msg = first_chain.invoke({"text": ""})
+    st.session_state.messages.append(AIMessage(content=initial_msg))
 
 # ===============================
-# ELIZAボットへの問い合わせ処理をラップ
+# メッセージ履歴の表示
 # ===============================
-# ユーザーからの入力に対して、ELIZAボットの応答を生成する関数を定義します。
-eliza_chain = RunnableLambda(lambda x: st.session_state.eliza_bot.respond(x) or st.session_state.eliza_bot.final())
-
-# ===============================
-# これまでのチャットメッセージを画面に表示
-# ===============================
-# セッション状態に保存された全てのメッセージをループで表示します。
 for message in st.session_state.messages:
-    # メッセージの種類（ユーザー or アシスタント）を判定
     role = "assistant" if isinstance(message, AIMessage) else "user"
-    # それぞれに対応するアバター（アイコン）を設定
     avatar = ":material/psychology:" if role == "assistant" else ":material/person:"
-    # st.chat_messageを用いて、チャット風のUIにメッセージを表示
     with st.chat_message(role, avatar=avatar):
         st.markdown(message.content)
 
 # ===============================
-# ユーザーからの新規入力受付
+# ユーザー入力の処理
 # ===============================
-# チャット入力欄を表示し、ユーザーの入力を待ちます。
-user_input = st.chat_input("ELIZAに質問してみてください")
+user_input = st.chat_input("ELIZAに話しかけてみましょう", key="user_input")
 if user_input:
-    # ユーザーの入力をHumanMessageとして作成し、履歴に追加
-    user_msg = HumanMessage(content=user_input)
-    st.session_state.messages.append(user_msg)
-    # ユーザーのメッセージをチャットUIに表示
+    st.session_state.messages.append(HumanMessage(content=user_input))
     with st.chat_message("user", avatar=":material/person:"):
         st.markdown(user_input)
 
-    # ELIZAボットにユーザーの入力を英語で渡して応答を生成。応答を日本語に翻訳
-    response = translate_to_japanese(eliza_chain.invoke(translate_to_english(user_input)))
+    try:
+        response = chain.invoke({"text": user_input})
+    except ConnectionError:
+        response = "⚠️ネットワークエラーが発生しました。接続を確認してください。"
+    except Exception as e:
+        response = f"⚠️エラーが発生しました: {str(e)}"
 
-    # 応答をAIMessageとして作成し、履歴に追加
-    ai_msg = AIMessage(content=response)
-    st.session_state.messages.append(ai_msg)
-    # ボットの応答をチャットUIに表示
+    st.session_state.messages.append(AIMessage(content=response))
     with st.chat_message("assistant", avatar=":material/psychology:"):
         st.markdown(response)
